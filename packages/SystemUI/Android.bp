@@ -75,6 +75,7 @@ android_library {
         "vendor.lineage.biometrics.fingerprint.inscreen-V1.0-java",
         "vendor.lineage.powershare-V1.0-java",
         "faceunlock_framework",
+        "monetcompat",
     ],
     manifest: "AndroidManifest.xml",
     additional_manifests: ["LineageManifest.xml"],
@@ -151,6 +152,7 @@ android_library {
         "truth-prebuilt",
         "dagger2-2.19",
         "jsr330",
+        "monetcompat",
         "org.lineageos.platform.internal",
         "vendor.lineage.biometrics.fingerprint.inscreen-V1.0-java",
         "vendor.lineage.powershare-V1.0-java",
@@ -193,4 +195,9 @@ android_app {
     dxflags: ["--multi-dex"],
     required: ["privapp_whitelist_com.android.systemui"],
 
+}
+
+android_library_import {
+    name: "monetcompat",
+    aars: ["libs/MonetCompat.aar"],
 }

@@ -433,6 +433,8 @@ package android {
     field public static final int collapseIcon = 16844031; // 0x10104ff
     field public static final int color = 16843173; // 0x10101a5
     field public static final int colorAccent = 16843829; // 0x1010435
+    field public static final int colorAccentBackground = 16844311; // 0x1010617
+    field public static final int colorAccentOverlay = 16844312; // 0x1010618
     field public static final int colorActivatedHighlight = 16843664; // 0x1010390
     field public static final int colorBackground = 16842801; // 0x1010031
     field public static final int colorBackgroundCacheHint = 16843435; // 0x10102ab
@@ -1652,6 +1654,7 @@ package android {
 
   public static final class R.color {
     ctor public R.color();
+    field public static final int accent_background_device_default = 17170461; // 0x106001d
     field public static final int background_dark = 17170446; // 0x106000e
     field public static final int background_light = 17170447; // 0x106000f
     field public static final int black = 17170444; // 0x106000c
@@ -12536,6 +12539,20 @@ package android.content.pm {
 
 package android.content.res {
 
+  public class AccentUtils {
+    ctor public AccentUtils();
+    method public int getBackgroundAccentColor(int);
+    method public int getDarkAccentColor(int);
+    method public int getLightAccentColor(int);
+    method public int getOverlayDarkAccentColor(int);
+    method public int getOverlayLightAccentColor(int);
+    method public boolean isResourceAccentBackground(@Nullable String);
+    method public boolean isResourceAccentOverlayDark(@Nullable String);
+    method public boolean isResourceAccentOverlayLight(@Nullable String);
+    method public boolean isResourceDarkAccent(@Nullable String);
+    method public boolean isResourceLightAccent(@Nullable String);
+  }
+
   public class AssetFileDescriptor implements java.io.Closeable android.os.Parcelable {
     ctor public AssetFileDescriptor(android.os.ParcelFileDescriptor, long, long);
     ctor public AssetFileDescriptor(android.os.ParcelFileDescriptor, long, long, android.os.Bundle);
@@ -12715,6 +12732,23 @@ package android.content.res {
     field public int smallestScreenWidthDp;
     field public int touchscreen;
     field public int uiMode;
+  }
+
+  public class MonetWannabe {
+    ctor public MonetWannabe(@NonNull android.content.Context);
+    method @ColorInt public static int adjustAlpha(@ColorInt int, float);
+    method public int getAccentColor();
+    method public int getAccentColorBackground();
+    method public int getAccentColorOverlayDark();
+    method public int getAccentColorOverlayLight();
+    method public static int getInactiveAccent(@NonNull android.content.Context);
+    method public static boolean isMonetEnabled(@NonNull android.content.Context);
+    method public static int manipulateColor(int, float);
+    method public static boolean shouldForceLoad(@NonNull android.content.Context);
+    method public static int updateMonet(@NonNull android.content.Context);
+    field public static final int DEFAULT_COLOR_GEN = 16; // 0x10
+    field public static final float DEFAULT_DARK_ALTERATION = 0.8f;
+    field public static final float DEFAULT_LIGHT_ALTERATION = 0.7f;
   }
 
   public class ObbInfo implements android.os.Parcelable {
@@ -40772,6 +40806,7 @@ package android.provider {
     field public static final String BLUETOOTH_DISCOVERABILITY = "bluetooth_discoverability";
     field public static final String BLUETOOTH_DISCOVERABILITY_TIMEOUT = "bluetooth_discoverability_timeout";
     field @Deprecated public static final String BLUETOOTH_ON = "bluetooth_on";
+    field public static final String BUTTON_BACKLIGHT_ONLY_WHEN_PRESSED = "button_backlight_only_when_pressed";
     field public static final android.net.Uri CONTENT_URI;
     field @Deprecated public static final String DATA_ROAMING = "data_roaming";
     field public static final String DATE_FORMAT = "date_format";

@@ -22,6 +22,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.om.OverlayManager;
 import android.content.pm.UserInfo;
+import android.content.res.MonetWannabe;
 import android.database.ContentObserver;
 import android.net.Uri;
 import android.os.AsyncTask;
@@ -38,6 +39,7 @@ import com.android.systemui.SystemUI;
 import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.tuner.TunerService;
+import com.android.systemui.custom.MonetWatcher;
 import com.android.systemui.settings.CurrentUserTracker;
 
 import com.google.android.collect.Sets;
@@ -150,18 +152,29 @@ public class ThemeOverlayController extends SystemUI {
                 UserHandle.USER_ALL);
         mOverlayManager = mContext.getSystemService(OverlayManager.class);
         mTunerService.addTunable(mTunable, KEY_BERRY_BLACK_THEME);
+        boolean monetEnabled = MonetWannabe.isMonetEnabled(mContext);
+        MonetWatcher mMonetWatcher = new MonetWatcher(mContext);
         ContentObserver observer = new ContentObserver(mBgHandler) {
             @Override
             public void onChange(boolean selfChange, Uri uri) {
                 if (uri.equals(Settings.Secure.getUriFor("accent_dark")) ||
-                        uri.equals(Settings.Secure.getUriFor("accent_light"))) {
-                    reloadAssets("android");
-                    reloadAssets("com.android.systemui");
+                            uri.equals(Settings.Secure.getUriFor("accent_light")) ||
+                            uri.equals(Settings.Secure.getUriFor(Settings.Secure.MONET_ENGINE)) ||
+                            (uri.equals(Settings.Secure.getUriFor(Settings.Secure.MONET_BASE_ACCENT)) && monetEnabled)) {
+                        reloadAssets("android");
+                        reloadAssets("com.android.systemui");
+                } else if (monetEnabled && 
+                            (uri.equals(Settings.Secure.getUriFor(Settings.Secure.MONET_CHROMA)) || 
+                            uri.equals(Settings.Secure.getUriFor(Settings.Secure.MONET_LIGHTNESS)) ||
+                            uri.equals(Settings.Secure.getUriFor(Settings.Secure.MONET_WALLPAPER_COLOR_PICKER)))) {
+                        mMonetWatcher.forceUpdate();
+                        reloadAssets("android");
+                        reloadAssets("com.android.systemui");
+                    }
                 }
-            }
-            private void reloadAssets(String packageName) {
-                try {
-                    IOverlayManager.Stub.asInterface(ServiceManager.getService("overlay"))
+                private void reloadAssets(String packageName) {
+                    try {
+                        IOverlayManager.Stub.asInterface(ServiceManager.getService("overlay"))
                             .reloadAssets(packageName, UserHandle.USER_CURRENT);
                 } catch (RemoteException e) {
                     Log.i(TAG, "Unable to reload resources for " + packageName);
@@ -173,6 +186,21 @@ public class ThemeOverlayController extends SystemUI {
                 false, observer, UserHandle.USER_ALL);
         mContext.getContentResolver().registerContentObserver(
                 Settings.Secure.getUriFor("accent_light"),
+                false, observer, UserHandle.USER_ALL);
+        mContext.getContentResolver().registerContentObserver(
+                Settings.Secure.getUriFor(Settings.Secure.MONET_BASE_ACCENT),
+                false, observer, UserHandle.USER_ALL);
+        mContext.getContentResolver().registerContentObserver(
+                Settings.Secure.getUriFor(Settings.Secure.MONET_CHROMA),
+                false, observer, UserHandle.USER_ALL);
+        mContext.getContentResolver().registerContentObserver(
+                Settings.Secure.getUriFor(Settings.Secure.MONET_LIGHTNESS),
+                false, observer, UserHandle.USER_ALL);
+        mContext.getContentResolver().registerContentObserver(
+                Settings.Secure.getUriFor(Settings.Secure.MONET_ENGINE),
+                false, observer, UserHandle.USER_ALL);
+        mContext.getContentResolver().registerContentObserver(
+                Settings.Secure.getUriFor(Settings.Secure.MONET_WALLPAPER_COLOR_PICKER),
                 false, observer, UserHandle.USER_ALL);
 
         mUserTracker = new CurrentUserTracker(mBroadcastDispatcher) {

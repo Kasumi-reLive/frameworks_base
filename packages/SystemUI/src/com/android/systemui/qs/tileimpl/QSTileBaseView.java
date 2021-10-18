@@ -19,6 +19,7 @@ import android.annotation.ColorInt;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.res.ColorStateList;
+import android.content.res.MonetWannabe;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.Color;
@@ -75,8 +76,8 @@ public class QSTileBaseView extends com.android.systemui.plugins.qs.QSTileView {
     private int mColorActiveAlpha;
     private int mColorTwelveAlpha;
     private int mColorDisabledAlpha;
-    private final int mColorInactive;
-    private final int mColorDisabled;
+    private int mColorInactive;
+    private int mColorDisabled;
     private int mCircleColor;
     private int mBgSize;
 
@@ -126,6 +127,11 @@ public class QSTileBaseView extends com.android.systemui.plugins.qs.QSTileView {
         setBackground(mTileBackground);
 
         mColorActive = Utils.getColorAttrDefaultColor(context, android.R.attr.colorAccent);
+        if (MonetWannabe.isMonetEnabled(context)) {
+            mColorInactive = MonetWannabe.getInactiveAccent(context);
+            mColorDisabled = mColorInactive;
+        } else {
+
         mColorActiveAlpha = adjustAlpha(mColorActive, 0.2f);
         mColorTwelveAlpha = adjustAlpha(mColorActive, 0.2f);
 
@@ -146,6 +152,8 @@ public class QSTileBaseView extends com.android.systemui.plugins.qs.QSTileView {
                     Utils.getColorAttrDefaultColor(context, android.R.attr.textColorTertiary));
         }
         mColorInactive = Utils.getColorAttrDefaultColor(context, android.R.attr.textColorSecondary);
+
+        }
 
         setPadding(0, 0, 0, 0);
         setClipChildren(false);
@@ -330,6 +338,7 @@ public class QSTileBaseView extends com.android.systemui.plugins.qs.QSTileView {
             case Tile.STATE_ACTIVE:
                 return mColorActive;
             case Tile.STATE_INACTIVE:
+                if (MonetWannabe.isMonetEnabled(getContext())) return mColorInactive;
             case Tile.STATE_UNAVAILABLE:
                 return mColorDisabled;
             default:

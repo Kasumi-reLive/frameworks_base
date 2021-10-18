@@ -34,6 +34,7 @@ import android.annotation.NonNull;
 import android.app.ActivityManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.MonetWannabe;
 import android.graphics.drawable.Drawable;
 import android.metrics.LogMaker;
 import android.os.Handler;
@@ -527,7 +528,9 @@ public abstract class QSTileImpl<TState extends State> implements QSTile, Lifecy
                     return Utils.getColorAttrDefaultColor(context, android.R.attr.textColorSecondary);
                 }
             case Tile.STATE_ACTIVE:
-                if (setQsUseNewTint == 1) {
+                if (MonetWannabe.isMonetEnabled(context)) {
+                    return Utils.getColorAttrDefaultColor(context, android.R.attr.colorPrimary);
+		} else if (setQsUseNewTint == 1) {
                     return Utils.getColorAttrDefaultColor(context, android.R.attr.colorAccent);
 		} else if (setQsUseNewTint == 2){
                     return context.getResources().getColor(R.color.qs_tile_oos);

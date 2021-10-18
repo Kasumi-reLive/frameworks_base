@@ -433,6 +433,8 @@ package android {
     field public static final int collapseIcon = 16844031; // 0x10104ff
     field public static final int color = 16843173; // 0x10101a5
     field public static final int colorAccent = 16843829; // 0x1010435
+    field public static final int colorAccentBackground = 16844311; // 0x1010617
+    field public static final int colorAccentOverlay = 16844312; // 0x1010618
     field public static final int colorActivatedHighlight = 16843664; // 0x1010390
     field public static final int colorBackground = 16842801; // 0x1010031
     field public static final int colorBackgroundCacheHint = 16843435; // 0x10102ab
@@ -1652,6 +1654,7 @@ package android {
 
   public static final class R.color {
     ctor public R.color();
+    field public static final int accent_background_device_default = 17170461; // 0x106001d
     field public static final int background_dark = 17170446; // 0x106000e
     field public static final int background_light = 17170447; // 0x106000f
     field public static final int black = 17170444; // 0x106000c
