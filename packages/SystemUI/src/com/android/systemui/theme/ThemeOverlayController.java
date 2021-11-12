@@ -211,6 +211,10 @@ public class ThemeOverlayController extends SystemUI {
             }
         };
         mUserTracker.startTracking();
+
+        if (monetEnabled) {
+            mMonetWatcher.forceUpdate();
+        }
     }
 
     private void updateThemeOverlays() {
