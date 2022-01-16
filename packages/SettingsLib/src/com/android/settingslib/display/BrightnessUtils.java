@@ -16,12 +16,18 @@
 
 package com.android.settingslib.display;
 
+import android.os.SystemProperties;
 import android.util.MathUtils;
+
+import com.android.internal.BrightnessSynchronizer;
 
 public class BrightnessUtils {
 
+    private static final boolean sysUseLowGamma = SystemProperties.getBoolean(
+            "persist.sys.brightness.low.gamma", false);
+
     public static final int GAMMA_SPACE_MIN = 0;
-    public static final int GAMMA_SPACE_MAX = 65535;
+    public static final int GAMMA_SPACE_MAX = sysUseLowGamma ? 255 : 65535;
 
     // Hybrid Log Gamma constant values
     private static final float R = 0.5f;
@@ -75,6 +81,12 @@ public class BrightnessUtils {
      * @return The corresponding setting value.
      */
     public static final float convertGammaToLinearFloat(int val, float min, float max) {
+        if (sysUseLowGamma) {
+            return MathUtils.constrain(
+                     BrightnessSynchronizer.brightnessIntToFloat(val, 1, 255, 0.0f, 1.0f),
+                     min, max);
+        }
+
         final float normalizedVal = MathUtils.norm(GAMMA_SPACE_MIN, GAMMA_SPACE_MAX, val);
         final float ret;
         if (normalizedVal <= R) {
@@ -119,6 +131,23 @@ public class BrightnessUtils {
     }
 
     /**
+     * Translates specified value from the float brightness system to the int brightness system,
+     * given the min/max of each range.  Accounts for special values such as OFF and invalid values.
+     * Value returned as a float privimite (to preserve precision), but is a value within the
+     * int-system range.
+     */
+    private static float brightnessFloatToIntRange(float brightnessFloat, float minFloat,
+            float maxFloat, float minInt, float maxInt) {
+        if (BrightnessSynchronizer.floatEquals(brightnessFloat, -1.0f)) {
+            return 0;
+        } else if (Float.isNaN(brightnessFloat)) {
+            return -1;
+        } else {
+            return MathUtils.constrainedMap(minInt, maxInt, minFloat, maxFloat, brightnessFloat);
+        }
+    }
+
+    /**
      * Version of {@link #convertLinearToGamma} that takes float values.
      * TODO: brightnessfloat merge with above method(?)
      * @param val The brightness setting value.
@@ -127,6 +156,12 @@ public class BrightnessUtils {
      * @return The corresponding slider value
      */
     public static final int convertLinearToGammaFloat(float val, float min, float max) {
+        if (sysUseLowGamma) {
+            return Math.round(brightnessFloatToIntRange(
+                       MathUtils.constrain(val, min, max),
+                       0.0f, 1.0f, (float) 1, (float) 255));
+        }
+
         // For some reason, HLG normalizes to the range [0, 12] rather than [0, 1]
         final float normalizedVal = MathUtils.norm(min, max, val) * 12;
         final float ret;
