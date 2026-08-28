@@ -4530,6 +4530,18 @@ public class PackageManagerService extends IPackageManager.Stub
 
             generateFakeSignature(p).ifPresent(fakeSignature -> {
                 packageInfo.signatures = new Signature[]{fakeSignature};
+                try {
+                    packageInfo.signingInfo = new SigningInfo(
+                            new SigningDetails(
+                                    packageInfo.signatures,
+                                    SigningDetails.SignatureSchemeVersion.SIGNING_BLOCK_V3,
+                                    PackageParser.toSigningKeys(packageInfo.signatures),
+                                    null
+                            )
+                    );
+                } catch (CertificateException e) {
+                    Slog.e(TAG, "Caught an exception when creating signing keys: ", e);
+                }
             });
 
             return packageInfo;
@@ -13190,9 +13202,11 @@ public class PackageManagerService extends IPackageManager.Stub
                 if (shouldFilterApplicationLocked(pkgSetting, callingUid, userId)) {
                     return false;
                 }
-                // Do not allow "android" is being disabled
-                if ("android".equals(packageName)) {
-                    Slog.w(TAG, "Cannot hide package: android");
+                // Don't allow hiding "android" or SysUI as it makes device unusable.
+                if ("android".equals(packageName)
+                        || LocalServices.getService(PackageManagerInternal.class)
+                                .getSystemUiServiceComponent().getPackageName().equals(packageName)) {
+                    Slog.w(TAG, "Cannot hide package: " + packageName);
                     return false;
                 }
                 // Cannot hide static shared libs as they are considered
@@ -13406,11 +13420,18 @@ public class PackageManagerService extends IPackageManager.Stub
                     (installFlags & PackageManager.INSTALL_INSTANT_APP) != 0;
             final boolean fullApp =
                     (installFlags & PackageManager.INSTALL_FULL_APP) != 0;
+            final boolean isPackageDeviceAdmin = isPackageDeviceAdmin(packageName, userId);
+            final boolean isProtectedPackage = mProtectedPackages != null
+                    && mProtectedPackages.isPackageStateProtected(userId, packageName);
 
             // writer
             synchronized (mLock) {
                 pkgSetting = mSettings.mPackages.get(packageName);
                 if (pkgSetting == null) {
+                    return PackageManager.INSTALL_FAILED_INVALID_URI;
+                }
+                if (instantApp && (pkgSetting.isSystem() || isUpdatedSystemApp(pkgSetting)
+                        || isPackageDeviceAdmin || isProtectedPackage)) {
                     return PackageManager.INSTALL_FAILED_INVALID_URI;
                 }
                 if (!canViewInstantApps(callingUid, UserHandle.getUserId(callingUid))) {
@@ -19610,7 +19631,7 @@ public class PackageManagerService extends IPackageManager.Stub
             clearDefaultBrowserIfNeededForUser(ps.name, nextUserId);
             removeKeystoreDataIfNeeded(mInjector.getUserManagerInternal(), nextUserId, ps.appId);
             clearPackagePreferredActivities(ps.name, nextUserId);
-            mPermissionManager.resetRuntimePermissions(pkg, nextUserId);
+            mPermissionManager.resetRuntimePermissions(pkg, nextUserId, false);
         }
 
         if (outInfo != null) {
@@ -19641,7 +19662,8 @@ public class PackageManagerService extends IPackageManager.Stub
 
     @Override
     public void clearApplicationUserData(final String packageName,
-            final IPackageDataObserver observer, final int userId) {
+            final IPackageDataObserver observer, final int userId,
+            boolean restorePregrantedPermissions) {
         mContext.enforceCallingOrSelfPermission(
                 android.Manifest.permission.CLEAR_APP_USER_DATA, null);
 
@@ -19667,7 +19689,8 @@ public class PackageManagerService extends IPackageManager.Stub
                     try (PackageFreezer freezer = freezePackage(packageName,
                             "clearApplicationUserData")) {
                         synchronized (mInstallLock) {
-                            succeeded = clearApplicationUserDataLIF(packageName, userId);
+                            succeeded = clearApplicationUserDataLIF(packageName, userId,
+                                    restorePregrantedPermissions);
                         }
                         synchronized (mLock) {
                             mInstantAppRegistry.deleteInstantApplicationMetadataLPw(
@@ -19702,7 +19725,8 @@ public class PackageManagerService extends IPackageManager.Stub
         });
     }
 
-    private boolean clearApplicationUserDataLIF(String packageName, int userId) {
+    private boolean clearApplicationUserDataLIF(String packageName, int userId,
+            boolean restorePregrantedPermissions) {
         if (packageName == null) {
             Slog.w(TAG, "Attempt to delete null packageName.");
             return false;
@@ -19724,7 +19748,7 @@ public class PackageManagerService extends IPackageManager.Stub
             Slog.w(TAG, "Package named '" + packageName + "' doesn't exist.");
             return false;
         }
-        mPermissionManager.resetRuntimePermissions(pkg, userId);
+        mPermissionManager.resetRuntimePermissions(pkg, userId, restorePregrantedPermissions);
 
         clearAppDataLIF(pkg, userId,
                 FLAG_STORAGE_DE | FLAG_STORAGE_CE | FLAG_STORAGE_EXTERNAL);
@@ -25880,10 +25904,20 @@ public class PackageManagerService extends IPackageManager.Stub
         }
     }
 
-    private void applyMimeGroupChanges(String packageName, String mimeGroup) {
+    private void applyMimeGroupChanges(String packageName, String mimeGroup,
+            List<Integer> packageUids) {
         if (mComponentResolver.updateMimeGroup(packageName, mimeGroup)) {
-            Binder.withCleanCallingIdentity(() ->
-                    clearPackagePreferredActivities(packageName, UserHandle.USER_ALL));
+            Binder.withCleanCallingIdentity(() -> {
+                clearPackagePreferredActivities(packageName, UserHandle.USER_ALL);
+                // Send the ACTION_PACKAGE_CHANGED when the mimeGroup has changes
+                final ArrayList<String> components = new ArrayList<>(
+                        Collections.singletonList(packageName));
+                final String reason = "The mimeGroup is changed";
+                for (int i = 0; i < packageUids.size(); i++) {
+                    sendPackageChangedBroadcast(packageName, true /* dontKillApp */,
+                            components, packageUids.get(i), reason);
+                }
+            });
         }
 
         mPmInternal.writeSettings(false);
@@ -25894,8 +25928,20 @@ public class PackageManagerService extends IPackageManager.Stub
         boolean changed = mSettings.mPackages.get(packageName)
                 .setMimeGroup(mimeGroup, mimeTypes);
 
+        final List<Integer> packageUids = new ArrayList<Integer>();
+        final PackageSetting ps = mSettings.getPackageLPr(packageName);
         if (changed) {
-            applyMimeGroupChanges(packageName, mimeGroup);
+            final int appId = ps.appId;
+            final int[] userIds = resolveUserIds(UserHandle.USER_ALL);
+            for (int i = 0; i < userIds.length; i++) {
+                final int userId = userIds[i];
+                if (ps.getInstalled(userId)) {
+                    packageUids.add(UserHandle.getUid(userId, appId));
+                }
+            }
+        }
+        if (changed) {
+            applyMimeGroupChanges(packageName, mimeGroup, packageUids);
         }
     }
 
